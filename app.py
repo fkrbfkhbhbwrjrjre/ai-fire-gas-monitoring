@@ -1,25 +1,37 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, jsonify
 import random
+from collections import deque
 
 app = Flask(__name__)
 
-# ---- Simple AI Risk Prediction Logic ----
+# Store last 20 risk values
+risk_history = deque(maxlen=20)
+
+# AI-based risk calculation (rule-based intelligence)
 def calculate_risk(temp, gas, flame):
     risk = 0
 
-    if temp > 40:
+    if temp > 50:
         risk += 30
+    elif temp > 35:
+        risk += 15
+
     if gas > 400:
         risk += 40
-    if flame == 1:
-        risk += 30
+    elif gas > 250:
+        risk += 20
 
-    if risk >= 70:
-        level = "HIGH"
-    elif risk >= 40:
+    if flame == 1:
+        risk += 50
+
+    risk = min(risk, 100)
+
+    if risk < 30:
+        level = "LOW"
+    elif risk < 60:
         level = "MEDIUM"
     else:
-        level = "LOW"
+        level = "HIGH"
 
     return risk, level
 
@@ -29,23 +41,6 @@ def home():
     return render_template("index.html")
 
 
-@app.route("/predict", methods=["POST"])
-def predict():
-    data = request.json
-
-    temp = data.get("temperature", 25)
-    gas = data.get("gas", 200)
-    flame = data.get("flame", 0)
-
-    risk, level = calculate_risk(temp, gas, flame)
-
-    return jsonify({
-        "risk_percentage": risk,
-        "risk_level": level
-    })
-
-
-# ---- Demo Data Route (for testing without Arduino) ----
 @app.route("/demo")
 def demo():
     temp = random.randint(25, 60)
@@ -53,6 +48,8 @@ def demo():
     flame = random.choice([0, 1])
 
     risk, level = calculate_risk(temp, gas, flame)
+
+    risk_history.append(risk)
 
     return jsonify({
         "temperature": temp,
@@ -63,5 +60,7 @@ def demo():
     })
 
 
-if __name__ == "__main__":
-    app.run(debug=True)
+@app.route("/risk-history")
+def risk_history_api():
+    return jsonify(list(risk_history))
+
